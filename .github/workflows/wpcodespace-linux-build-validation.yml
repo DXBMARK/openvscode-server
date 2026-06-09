@@ -1,0 +1,61 @@
+name: WPCodeSpace OpenVSCode Linux Build Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-web:
+    name: Compile web workbench on Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read Node version
+        id: node-version
+        shell: bash
+        run: |
+          echo "version=$(cat .nvmrc)" >> "$GITHUB_OUTPUT"
+          cat .nvmrc
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+          cache: npm
+
+      - name: Show environment
+        shell: bash
+        run: |
+          node -v
+          npm -v
+          python3 --version
+          uname -a
+          git rev-parse HEAD
+
+      - name: Install dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Compile web workbench
+        shell: bash
+        run: npm run compile-web
+
+      - name: Verify no manual generated bundle patch is required
+        shell: bash
+        run: |
+          if git status --short | grep -E 'workbench\.js|nls\.messages'; then
+            echo "Generated runtime bundle files changed unexpectedly."
+            git status --short
+            exit 1
+          fi
+
+          echo "OK: no tracked generated workbench.js or nls.messages changes"
