@@ -1099,9 +1099,9 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		if (this.input.currentModeKind === ChatModeKind.Ask) {
 			title = localize('chatDescription', "Ask about your code");
 		} else if (this.input.currentModeKind === ChatModeKind.Edit) {
-			title = localize('editsTitle', "Edit in context");
+			title = localize('editsTitle', "Plan changes");
 		} else {
-			title = localize('agentTitle', "Build with Agent");
+			title = localize('agentTitle', "Describe what to build");
 		}
 
 		return {
@@ -1121,14 +1121,24 @@ export class ChatWidget extends Disposable implements IChatWidget {
 			if (isEmpty) {
 				return [
 					{
-						icon: Codicon.vscode,
-						label: localize('chatWidget.suggestedPrompts.gettingStarted', "Ask @vscode"),
-						prompt: localize('chatWidget.suggestedPrompts.gettingStartedPrompt', "@vscode How do I change the theme to light mode?"),
+						icon: Codicon.debugAlt,
+						label: localize('chatWidget.suggestedPrompts.buildWorkspace', "Build Workspace"),
+						prompt: localize('chatWidget.suggestedPrompts.buildWorkspacePrompt', "Describe the workspace build flow and safe local prerequisites."),
 					},
 					{
-						icon: Codicon.newFolder,
-						label: localize('chatWidget.suggestedPrompts.newProject', "Create Project"),
-						prompt: localize('chatWidget.suggestedPrompts.newProjectPrompt', "Create a #new Hello World project in TypeScript"),
+						icon: Codicon.repo,
+						label: localize('chatWidget.suggestedPrompts.reviewWordPressProject', "Review WordPress Project"),
+						prompt: localize('chatWidget.suggestedPrompts.reviewWordPressProjectPrompt', "Review this WordPress project structure and summarize the main components."),
+					},
+					{
+						icon: Codicon.tasklist,
+						label: localize('chatWidget.suggestedPrompts.planChanges', "Plan Changes"),
+						prompt: localize('chatWidget.suggestedPrompts.planChangesPrompt', "Plan the safest steps for a local-only change before editing any files."),
+					},
+					{
+						icon: Codicon.gear,
+						label: localize('chatWidget.suggestedPrompts.findConfig', "Show Config"),
+						prompt: localize('chatWidget.suggestedPrompts.findConfigPrompt', "Show the main local configuration entry points for this workspace."),
 					}
 				];
 			} else {
@@ -1136,12 +1146,22 @@ export class ChatWidget extends Disposable implements IChatWidget {
 					{
 						icon: Codicon.debugAlt,
 						label: localize('chatWidget.suggestedPrompts.buildWorkspace', "Build Workspace"),
-						prompt: localize('chatWidget.suggestedPrompts.buildWorkspacePrompt', "How do I build this workspace?"),
+						prompt: localize('chatWidget.suggestedPrompts.buildWorkspacePrompt', "Describe the workspace build flow and safe local prerequisites."),
+					},
+					{
+						icon: Codicon.repo,
+						label: localize('chatWidget.suggestedPrompts.reviewWordPressProject', "Review WordPress Project"),
+						prompt: localize('chatWidget.suggestedPrompts.reviewWordPressProjectPrompt', "Review this WordPress project structure and summarize the main components."),
+					},
+					{
+						icon: Codicon.tasklist,
+						label: localize('chatWidget.suggestedPrompts.planChanges', "Plan Changes"),
+						prompt: localize('chatWidget.suggestedPrompts.planChangesPrompt', "Plan the safest steps for a local-only change before editing any files."),
 					},
 					{
 						icon: Codicon.gear,
 						label: localize('chatWidget.suggestedPrompts.findConfig', "Show Config"),
-						prompt: localize('chatWidget.suggestedPrompts.findConfigPrompt', "Where is the configuration for this project defined?"),
+						prompt: localize('chatWidget.suggestedPrompts.findConfigPrompt', "Show the main local configuration entry points for this workspace."),
 					}
 				];
 			}

@@ -1251,10 +1251,10 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 		} else {
 			switch (this.currentModeKind) {
 				case ChatModeKind.Agent:
-					modeLabel = localize('chatInput.mode.agent', "(Agent), edit files in your workspace.");
+					modeLabel = localize('chatInput.mode.agent', "(Agent), describe what to build for your workspace.");
 					break;
 				case ChatModeKind.Edit:
-					modeLabel = localize('chatInput.mode.edit', "(Edit), edit files in your workspace.");
+					modeLabel = localize('chatInput.mode.edit', "(Plan), plan and validate changes before you build.");
 					break;
 				case ChatModeKind.Ask:
 				default:
