@@ -51,3 +51,23 @@ The next validation phase should verify:
 - Do not patch nls.messages.js.
 - Do not treat the failed local macOS build as a product runtime failure.
 - Do not proceed to WPCodeSpace Docker image consumption until a Linux/CI build path passes.
+
+## Linux CI validation success
+
+The WPCodeSpace OpenVSCode Linux build validation workflow has passed after adding the required native Linux build dependencies.
+
+Validated in GitHub Actions on Linux:
+
+- npm ci
+- npm run compile-web
+- no tracked generated workbench.js or nls.messages patching required
+
+This establishes Linux CI as the supported validation path for WPCodeSpace OpenVSCode source customization.
+
+Next validation phase:
+
+1. Identify the correct OpenVSCode server/image build command.
+2. Produce a pinned WPCodeSpace OpenVSCode image from this fork.
+3. Run the image locally.
+4. Verify the WPCodeSpace Chat copy appears in the running OpenVSCode Chat panel.
+5. Only then update the WPCodeSpace repo to consume the pinned image.
