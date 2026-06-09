@@ -42,7 +42,9 @@ jobs:
             make \
             g++ \
             pkg-config \
-            libkrb5-dev
+            libkrb5-dev \
+            libx11-dev \
+            libxkbfile-dev
 
       - name: Show environment
         shell: bash
