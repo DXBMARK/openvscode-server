@@ -526,8 +526,8 @@ export class BuiltinChatMode implements IChatMode {
 
 export namespace ChatMode {
 	export const Ask = new BuiltinChatMode(ChatModeKind.Ask, 'Ask', localize('chatDescription', "Explore and understand your code"), Codicon.question);
-	export const Edit = new BuiltinChatMode(ChatModeKind.Edit, 'Edit', localize('editsDescription', "Edit or refactor selected code"), Codicon.edit);
-	export const Agent = new BuiltinChatMode(ChatModeKind.Agent, 'Agent', localize('agentDescription', "Describe what to build next"), Codicon.agent);
+	export const Edit = new BuiltinChatMode(ChatModeKind.Edit, 'Plan', localize('editsDescription', "Plan and validate changes before you build"), Codicon.edit);
+	export const Agent = new BuiltinChatMode(ChatModeKind.Agent, 'Agent', localize('agentDescription', "Describe what to build"), Codicon.agent);
 }
 
 export function isBuiltinChatMode(mode: IChatMode): boolean {
