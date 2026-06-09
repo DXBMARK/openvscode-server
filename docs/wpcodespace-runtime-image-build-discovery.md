@@ -115,3 +115,25 @@ Before changing WPCodeSpace to consume a pinned image, the following must be pro
 4. WPCodeSpace Chat copy appears in the running Chat panel.
 5. No generated runtime file was manually patched.
 6. The image is pinned by immutable tag or digest.
+
+## Server archive validation success
+
+The WPCodeSpace OpenVSCode Server Archive Validation workflow passed after preparing the required build metadata file at `out-build/date`.
+
+Validated in GitHub Actions on Linux:
+
+- `npm ci`
+- `npm run gulp vscode-reh-linux-x64-min-ci`
+- `npm run gulp vscode-reh-web-linux-x64-min-ci`
+- no tracked generated `workbench.js` or `nls.messages` patching required
+
+Successful workflow:
+
+- name: `WPCodeSpace OpenVSCode Server Archive Validation`
+- run id: `27236526209`
+- head SHA: `9e0d98f8af13dd5e36728b9afa97fb73bc0d9375`
+- conclusion: `success`
+
+This proves the fork can build the relevant Linux server archive candidates from source.
+
+This still does not create or publish a Docker image. The next phase must define the WPCodeSpace OpenVSCode image build strategy before WPCodeSpace consumes a pinned image.
