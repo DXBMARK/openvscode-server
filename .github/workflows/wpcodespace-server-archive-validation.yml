@@ -1,0 +1,96 @@
+name: WPCodeSpace OpenVSCode Server Archive Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-server-archives:
+    name: Build Linux server archive candidates
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      VSCODE_ARCH: x64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read Node version
+        id: node-version
+        shell: bash
+        run: |
+          echo "version=$(cat .nvmrc)" >> "$GITHUB_OUTPUT"
+          cat .nvmrc
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+          cache: npm
+
+      - name: Install Linux native build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            python3 \
+            make \
+            g++ \
+            pkg-config \
+            libkrb5-dev \
+            libx11-dev \
+            libxkbfile-dev
+
+      - name: Show environment
+        shell: bash
+        run: |
+          node -v
+          npm -v
+          python3 --version
+          gcc --version
+          g++ --version
+          pkg-config --version
+          uname -a
+          git rev-parse HEAD
+          echo "VSCODE_ARCH=$VSCODE_ARCH"
+
+      - name: Install dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Build Linux server archive candidate
+        shell: bash
+        run: npm run gulp vscode-reh-linux-${VSCODE_ARCH}-min-ci
+
+      - name: Build Linux web server archive candidate
+        shell: bash
+        run: npm run gulp vscode-reh-web-linux-${VSCODE_ARCH}-min-ci
+
+      - name: List archive outputs
+        shell: bash
+        run: |
+          echo "=== archive-like outputs ==="
+          find . -maxdepth 5 \
+            \( -iname '*.tar.gz' -o -iname '*.tgz' -o -iname '*.zip' -o -iname '*server*linux*' -o -iname '*reh*linux*' \) \
+            -not -path './node_modules/*' \
+            -not -path './.git/*' \
+            | sort | sed -n '1,240p'
+
+      - name: Verify no manual generated bundle patch is required
+        shell: bash
+        run: |
+          if git status --short | grep -E 'workbench\.js|nls\.messages'; then
+            echo "Generated runtime bundle files changed unexpectedly."
+            git status --short
+            exit 1
+          fi
+
+          echo "OK: no tracked generated workbench.js or nls.messages changes"
