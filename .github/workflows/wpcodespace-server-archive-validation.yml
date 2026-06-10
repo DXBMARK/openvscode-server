@@ -81,15 +81,28 @@ jobs:
         shell: bash
         run: npm run gulp vscode-reh-web-linux-${VSCODE_ARCH}-min-ci
 
-      - name: List archive outputs
+      - name: List server build outputs
         shell: bash
         run: |
-          echo "=== archive-like outputs ==="
-          find . -maxdepth 5 \
-            \( -iname '*.tar.gz' -o -iname '*.tgz' -o -iname '*.zip' -o -iname '*server*linux*' -o -iname '*reh*linux*' \) \
-            -not -path './node_modules/*' \
-            -not -path './.git/*' \
-            | sort | sed -n '1,240p'
+          echo "=== repository ==="
+          pwd
+
+          echo "=== parent build root ==="
+          ls -la ..
+
+          echo "=== expected server output directories ==="
+          for dir in ../vscode-reh-linux-${VSCODE_ARCH} ../vscode-reh-web-linux-${VSCODE_ARCH}; do
+            if [ ! -d "$dir" ]; then
+              echo "Missing expected server output directory: $dir"
+              exit 1
+            fi
+
+            echo "Found: $dir"
+            find "$dir" -maxdepth 3 -type f | sort | sed -n '1,120p'
+          done
+
+          echo "=== output sizes ==="
+          du -sh ../vscode-reh-linux-${VSCODE_ARCH} ../vscode-reh-web-linux-${VSCODE_ARCH}
 
       - name: Verify no manual generated bundle patch is required
         shell: bash
