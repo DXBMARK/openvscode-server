@@ -1,0 +1,222 @@
+name: WPCodeSpace OpenVSCode Image Build Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-image:
+    name: Build and smoke test OpenVSCode image
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      VSCODE_ARCH: x64
+      IMAGE_TAG: wpcodespace-openvscode:test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read Node version
+        id: node-version
+        shell: bash
+        run: |
+          echo "version=$(cat .nvmrc)" >> "$GITHUB_OUTPUT"
+          cat .nvmrc
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node-version.outputs.version }}
+          cache: npm
+
+      - name: Install Linux native build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            python3 \
+            make \
+            g++ \
+            pkg-config \
+            libkrb5-dev \
+            libx11-dev \
+            libxkbfile-dev
+
+      - name: Show environment
+        shell: bash
+        run: |
+          node -v
+          npm -v
+          python3 --version
+          gcc --version
+          g++ --version
+          docker --version
+          uname -a
+          git rev-parse HEAD
+          echo "VSCODE_ARCH=$VSCODE_ARCH"
+          echo "IMAGE_TAG=$IMAGE_TAG"
+
+      - name: Install dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Prepare build metadata
+        shell: bash
+        run: |
+          mkdir -p out-build
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > out-build/date
+          echo "out-build/date=$(cat out-build/date)"
+
+      - name: Build Linux web server output
+        shell: bash
+        run: npm run gulp vscode-reh-web-linux-${VSCODE_ARCH}-min
+
+      - name: Validate server output path
+        shell: bash
+        run: |
+          SERVER_OUTPUT="../vscode-reh-web-linux-${VSCODE_ARCH}"
+
+          if [ ! -d "$SERVER_OUTPUT" ]; then
+            echo "Missing server output directory: $SERVER_OUTPUT"
+            ls -la ..
+            exit 1
+          fi
+
+          if [ ! -x "$SERVER_OUTPUT/bin/openvscode-server" ]; then
+            echo "Missing executable: $SERVER_OUTPUT/bin/openvscode-server"
+            find "$SERVER_OUTPUT/bin" -maxdepth 2 -type f -print
+            exit 1
+          fi
+
+          if [ ! -x "$SERVER_OUTPUT/node" ]; then
+            echo "Missing executable: $SERVER_OUTPUT/node"
+            find "$SERVER_OUTPUT" -maxdepth 2 -type f -name node -print
+            exit 1
+          fi
+
+          if [ ! -f "$SERVER_OUTPUT/out/server-main.js" ]; then
+            echo "Missing runtime entrypoint: $SERVER_OUTPUT/out/server-main.js"
+            find "$SERVER_OUTPUT" -maxdepth 4 -type f | sort | sed -n '1,240p'
+            exit 1
+          fi
+
+          echo "Found server output: $SERVER_OUTPUT"
+          du -sh "$SERVER_OUTPUT"
+          find "$SERVER_OUTPUT" -maxdepth 3 -type f | sort | sed -n '1,160p'
+
+      - name: Create Docker build context
+        shell: bash
+        run: |
+          rm -rf /tmp/wpcodespace-openvscode-image-context
+          mkdir -p /tmp/wpcodespace-openvscode-image-context/openvscode-server
+
+          cp -a ../vscode-reh-web-linux-${VSCODE_ARCH}/. /tmp/wpcodespace-openvscode-image-context/openvscode-server/
+
+          cat > /tmp/wpcodespace-openvscode-image-context/Dockerfile <<'DOCKERFILE'
+          FROM ubuntu:24.04
+
+          RUN apt-get update && apt-get install -y --no-install-recommends \
+            ca-certificates \
+            curl \
+            git \
+            libasound2t64 \
+            libatk-bridge2.0-0 \
+            libatk1.0-0 \
+            libcups2 \
+            libdrm2 \
+            libgbm1 \
+            libgtk-3-0 \
+            libnss3 \
+            libx11-6 \
+            libx11-xcb1 \
+            libxcb1 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxext6 \
+            libxfixes3 \
+            libxkbfile1 \
+            libxrandr2 \
+            libxshmfence1 \
+            libxss1 \
+            libxtst6 \
+            xdg-utils \
+            && rm -rf /var/lib/apt/lists/*
+
+          RUN useradd -m -u 10001 openvscode
+
+          WORKDIR /opt/openvscode-server
+          COPY openvscode-server/ /opt/openvscode-server/
+
+          RUN chown -R openvscode:openvscode /opt/openvscode-server /home/openvscode
+
+          USER openvscode
+          ENV HOME=/home/openvscode
+
+          EXPOSE 3000
+
+          CMD ["./bin/openvscode-server", "--host", "0.0.0.0", "--port", "3000", "--without-connection-token"]
+          DOCKERFILE
+
+          echo "=== Docker context ==="
+          find /tmp/wpcodespace-openvscode-image-context -maxdepth 3 -type f | sort | sed -n '1,160p'
+          du -sh /tmp/wpcodespace-openvscode-image-context
+
+      - name: Build test image
+        shell: bash
+        run: |
+          docker build \
+            --pull \
+            -t "$IMAGE_TAG" \
+            /tmp/wpcodespace-openvscode-image-context
+
+          docker image inspect "$IMAGE_TAG" \
+            --format 'image={{.Id}} size={{.Size}} created={{.Created}}'
+
+      - name: Run container smoke test
+        shell: bash
+        run: |
+          docker rm -f wpcodespace-openvscode-smoke 2>/dev/null || true
+
+          docker run -d \
+            --name wpcodespace-openvscode-smoke \
+            -p 3000:3000 \
+            "$IMAGE_TAG"
+
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/ >/tmp/openvscode-smoke-response.html; then
+              echo "OpenVSCode responded on attempt $i"
+              head -40 /tmp/openvscode-smoke-response.html
+              docker logs wpcodespace-openvscode-smoke --tail 120
+              docker rm -f wpcodespace-openvscode-smoke
+              exit 0
+            fi
+
+            echo "Waiting for OpenVSCode to respond... attempt $i"
+            docker logs wpcodespace-openvscode-smoke --tail 80 || true
+            sleep 2
+          done
+
+          echo "OpenVSCode did not respond in time"
+          docker ps -a
+          docker logs wpcodespace-openvscode-smoke || true
+          docker rm -f wpcodespace-openvscode-smoke
+          exit 1
+
+      - name: Verify no manual generated bundle patch is required
+        shell: bash
+        run: |
+          if git status --short | grep -E 'workbench\.js|nls\.messages'; then
+            echo "Generated runtime bundle files changed unexpectedly."
+            git status --short
+            exit 1
+          fi
+
+          echo "OK: no tracked generated workbench.js or nls.messages changes"
