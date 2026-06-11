@@ -77,7 +77,7 @@ jobs:
 
       - name: Build Linux web server output
         shell: bash
-        run: npm run gulp vscode-reh-web-linux-${VSCODE_ARCH}-min-ci
+        run: npm run gulp vscode-reh-web-linux-${VSCODE_ARCH}-min
 
       - name: Validate server output path
         shell: bash
@@ -99,6 +99,12 @@ jobs:
           if [ ! -x "$SERVER_OUTPUT/node" ]; then
             echo "Missing executable: $SERVER_OUTPUT/node"
             find "$SERVER_OUTPUT" -maxdepth 2 -type f -name node -print
+            exit 1
+          fi
+
+          if [ ! -f "$SERVER_OUTPUT/out/server-main.js" ]; then
+            echo "Missing runtime entrypoint: $SERVER_OUTPUT/out/server-main.js"
+            find "$SERVER_OUTPUT" -maxdepth 4 -type f | sort | sed -n '1,240p'
             exit 1
           fi
 
