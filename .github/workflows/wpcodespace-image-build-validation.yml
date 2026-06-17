@@ -106,11 +106,28 @@ jobs:
           fi
 
           if [ ! -f "$SERVER_OUTPUT/out/server-main.js" ]; then
-            echo "Missing runtime entrypoint: $SERVER_OUTPUT/out/server-main.js"
-            find "$SERVER_OUTPUT" -maxdepth 4 -type f | sort | sed -n '1,240p'
+            echo "Packaged output is missing runtime entrypoint: $SERVER_OUTPUT/out/server-main.js"
+            echo "Attempting to assemble runtime from repository out/ directory"
+
+            if [ ! -f "out/server-main.js" ]; then
+              echo "Missing built runtime entrypoint: out/server-main.js"
+              echo "Repository out/ files:"
+              find out -maxdepth 4 -type f | sort | sed -n '1,240p' || true
+              echo "Packaged output files:"
+              find "$SERVER_OUTPUT" -maxdepth 4 -type f | sort | sed -n '1,240p'
+              exit 1
+            fi
+
+            mkdir -p "$SERVER_OUTPUT/out"
+            cp -a out/. "$SERVER_OUTPUT/out/"
+          fi
+
+          if [ ! -f "$SERVER_OUTPUT/out/server-main.js" ]; then
+            echo "Missing runtime entrypoint after assembly: $SERVER_OUTPUT/out/server-main.js"
             exit 1
           fi
 
+          echo "Found runtime entrypoint: $SERVER_OUTPUT/out/server-main.js"
           echo "Found server output: $SERVER_OUTPUT"
           du -sh "$SERVER_OUTPUT"
           find "$SERVER_OUTPUT" -maxdepth 3 -type f | sort | sed -n '1,160p'
