@@ -90,6 +90,8 @@ jobs:
         run: |
           npm run server:init
           npm run compile-web
+          npm run compile-build
+          npm run gulp minify-vscode-reh-web
           npm run gulp vscode-reh-web-linux-${VSCODE_ARCH}-min-ci
           npm run gulp vscode-web-min-ci
 
@@ -104,9 +106,10 @@ jobs:
             "$SERVER_OUTPUT"
             "../vscode-reh-linux-${VSCODE_ARCH}"
             "../vscode-web"
+            "../vscode-reh-web-linux-${VSCODE_ARCH}"
+            "../vscode-server-linux-${VSCODE_ARCH}-web"
             "out-vscode-reh-web-min"
             "out-vscode-web-min"
-            "../vscode-server-linux-${VSCODE_ARCH}-web"
           )
 
           print_candidates() {
@@ -121,11 +124,25 @@ jobs:
             done | sort -u | sed -n '1,80p'
           }
 
+          print_css_candidates() {
+            echo "workbench.css candidates:"
+            for search_root in "${SEARCH_ROOTS[@]}"; do
+              if [ -e "$search_root" ]; then
+                find "$search_root" -name "workbench*.css" -print
+                find "$search_root" -path "*/vs/code/browser/workbench/*.css" -print
+                find "$search_root" -path "*/vs/workbench/*.css" -print
+                find "$search_root" -path "*/vs/workbench/*/*.css" -print
+                find "$search_root" -path "*/vs/workbench/*/*/*.css" -print
+                find "$search_root" -name "*.css" -print | grep -E "workbench|code/browser|vs/workbench" || true
+              fi
+            done | sort -u | sed -n '1,120p'
+          }
+
           echo "=== Locate OpenVSCode runtime and web assets ==="
           print_candidates "server-main.js candidates:" "*/server-main.js"
-          print_candidates "workbench.css candidates:" "*/vs/code/browser/workbench/workbench.css"
-          print_candidates "nls.messages.js candidates:" "*/nls.messages.js"
-          print_candidates "nls.messages.json candidates:" "*/nls.messages.json"
+          print_candidates "NLS asset candidates:" "*/nls.messages.js"
+          print_candidates "NLS asset candidates:" "*/nls.messages.json"
+          print_css_candidates
 
       - name: Validate server output path
         shell: bash
@@ -189,55 +206,69 @@ jobs:
           cp -a "$SERVER_OUTPUT/." "$IMAGE_CONTEXT/openvscode-server/"
 
           WEB_ASSET_SOURCE=""
+          WEB_ASSET_OUT_SOURCE=""
+          WORKBENCH_CSS_PATH="vs/code/browser/workbench/workbench.css"
           WEB_ASSET_CANDIDATES=(
             "$SERVER_OUTPUT"
-            "../vscode-web"
             "../vscode-reh-web-linux-${VSCODE_ARCH}"
             "../vscode-server-linux-${VSCODE_ARCH}-web"
             "out-vscode-reh-web-min"
+            "../vscode-web"
             "out-vscode-web-min"
           )
 
           for candidate in "${WEB_ASSET_CANDIDATES[@]}"; do
-            if [ -f "$candidate/out/vs/code/browser/workbench/workbench.css" ] && [ -f "$candidate/out/nls.messages.js" ]; then
+            if [ -f "$candidate/out/$WORKBENCH_CSS_PATH" ] && [ -f "$candidate/out/nls.messages.js" ] && [ -f "$candidate/out/nls.messages.json" ]; then
               WEB_ASSET_SOURCE="$candidate"
+              WEB_ASSET_OUT_SOURCE="$candidate/out"
+              break
+            fi
+
+            if [ -f "$candidate/$WORKBENCH_CSS_PATH" ] && [ -f "$candidate/nls.messages.js" ] && [ -f "$candidate/nls.messages.json" ]; then
+              WEB_ASSET_SOURCE="$candidate"
+              WEB_ASSET_OUT_SOURCE="$candidate"
               break
             fi
           done
 
-          if [ -z "$WEB_ASSET_SOURCE" ]; then
-            echo "Missing web client asset source with required workbench.css and nls.messages.js"
+          print_asset_diagnostics() {
             echo "=== Locate OpenVSCode runtime and web assets ==="
             echo "server-main.js candidates:"
-            for search_root in . out out-build "$SERVER_OUTPUT" "../vscode-reh-linux-${VSCODE_ARCH}" "../vscode-web" out-vscode-reh-web-min out-vscode-web-min "../vscode-server-linux-${VSCODE_ARCH}-web"; do
+            for search_root in . out out-build "$SERVER_OUTPUT" "../vscode-reh-linux-${VSCODE_ARCH}" "../vscode-web" "../vscode-reh-web-linux-${VSCODE_ARCH}" "../vscode-server-linux-${VSCODE_ARCH}-web" out-vscode-reh-web-min out-vscode-web-min; do
               if [ -e "$search_root" ]; then
                 find "$search_root" -path "*/server-main.js" -print
               fi
             done | sort -u | sed -n '1,80p'
-            echo "workbench.css candidates:"
-            for search_root in . out out-build "$SERVER_OUTPUT" "../vscode-reh-linux-${VSCODE_ARCH}" "../vscode-web" out-vscode-reh-web-min out-vscode-web-min "../vscode-server-linux-${VSCODE_ARCH}-web"; do
-              if [ -e "$search_root" ]; then
-                find "$search_root" -path "*/vs/code/browser/workbench/workbench.css" -print
-              fi
-            done | sort -u | sed -n '1,80p'
-            echo "nls.messages.js candidates:"
-            for search_root in . out out-build "$SERVER_OUTPUT" "../vscode-reh-linux-${VSCODE_ARCH}" "../vscode-web" out-vscode-reh-web-min out-vscode-web-min "../vscode-server-linux-${VSCODE_ARCH}-web"; do
+            echo "NLS asset candidates:"
+            for search_root in . out out-build "$SERVER_OUTPUT" "../vscode-reh-linux-${VSCODE_ARCH}" "../vscode-web" "../vscode-reh-web-linux-${VSCODE_ARCH}" "../vscode-server-linux-${VSCODE_ARCH}-web" out-vscode-reh-web-min out-vscode-web-min; do
               if [ -e "$search_root" ]; then
                 find "$search_root" -path "*/nls.messages.js" -print
-              fi
-            done | sort -u | sed -n '1,80p'
-            echo "nls.messages.json candidates:"
-            for search_root in . out out-build "$SERVER_OUTPUT" "../vscode-reh-linux-${VSCODE_ARCH}" "../vscode-web" out-vscode-reh-web-min out-vscode-web-min "../vscode-server-linux-${VSCODE_ARCH}-web"; do
-              if [ -e "$search_root" ]; then
                 find "$search_root" -path "*/nls.messages.json" -print
               fi
             done | sort -u | sed -n '1,80p'
+            echo "workbench.css candidates:"
+            for search_root in . out out-build "$SERVER_OUTPUT" "../vscode-reh-linux-${VSCODE_ARCH}" "../vscode-web" "../vscode-reh-web-linux-${VSCODE_ARCH}" "../vscode-server-linux-${VSCODE_ARCH}-web" out-vscode-reh-web-min out-vscode-web-min; do
+              if [ -e "$search_root" ]; then
+                find "$search_root" -name "workbench*.css" -print
+                find "$search_root" -path "*/vs/code/browser/workbench/*.css" -print
+                find "$search_root" -path "*/vs/workbench/*.css" -print
+                find "$search_root" -path "*/vs/workbench/*/*.css" -print
+                find "$search_root" -path "*/vs/workbench/*/*/*.css" -print
+                find "$search_root" -name "*.css" -print | grep -E "workbench|code/browser|vs/workbench" || true
+              fi
+            done | sort -u | sed -n '1,120p'
+          }
+
+          if [ -z "$WEB_ASSET_OUT_SOURCE" ]; then
+            echo "Missing web client asset source with required workbench stylesheet, nls.messages.js, and nls.messages.json"
+            print_asset_diagnostics
             exit 1
           fi
 
-          echo "Using web client asset source: $WEB_ASSET_SOURCE"
+          echo "Selected web asset source: $WEB_ASSET_SOURCE"
+          echo "Selected workbench CSS path: out/$WORKBENCH_CSS_PATH"
           mkdir -p "$IMAGE_CONTEXT/openvscode-server/out"
-          cp -a "$WEB_ASSET_SOURCE/out/." "$IMAGE_CONTEXT/openvscode-server/out/"
+          cp -a "$WEB_ASSET_OUT_SOURCE/." "$IMAGE_CONTEXT/openvscode-server/out/"
 
           python3 - "$IMAGE_CONTEXT/Dockerfile" <<'PYTHON'
           from pathlib import Path
@@ -286,8 +317,9 @@ jobs:
 
           REQUIRED_CONTEXT_FILES=(
             "$IMAGE_CONTEXT/openvscode-server/out/server-main.js"
-            "$IMAGE_CONTEXT/openvscode-server/out/vs/code/browser/workbench/workbench.css"
+            "$IMAGE_CONTEXT/openvscode-server/out/$WORKBENCH_CSS_PATH"
             "$IMAGE_CONTEXT/openvscode-server/out/nls.messages.js"
+            "$IMAGE_CONTEXT/openvscode-server/out/nls.messages.json"
           )
 
           for required_file in "${REQUIRED_CONTEXT_FILES[@]}"; do
@@ -296,7 +328,7 @@ jobs:
               echo "Docker context out files:"
               find "$IMAGE_CONTEXT/openvscode-server/out" -maxdepth 6 -type f | sort | sed -n '1,240p'
               echo "Discovered source files:"
-              find "$WEB_ASSET_SOURCE/out" -maxdepth 6 -type f | sort | sed -n '1,240p'
+              find "$WEB_ASSET_OUT_SOURCE" -maxdepth 6 -type f | sort | sed -n '1,240p'
               exit 1
             fi
           done
@@ -332,6 +364,7 @@ jobs:
             test -f /opt/openvscode-server/out/server-main.js
             test -f /opt/openvscode-server/out/vs/code/browser/workbench/workbench.css
             test -f /opt/openvscode-server/out/nls.messages.js
+            test -f /opt/openvscode-server/out/nls.messages.json
           '
 
           echo "Found web client assets in built image"
@@ -352,11 +385,7 @@ jobs:
           fail_on_missing_asset_logs() {
             docker logs wpcodespace-openvscode-smoke > "$SMOKE_LOG" 2>&1 || true
 
-            if grep -F \
-              -e "File not found: /opt/openvscode-server/out/vs/code/browser/workbench/workbench.css" \
-              -e "File not found: /opt/openvscode-server/out/nls.messages.js" \
-              -e "Error reading NLS messages file" \
-              "$SMOKE_LOG"; then
+            if grep -F "File not found:" "$SMOKE_LOG" || grep -F "Error reading NLS messages file" "$SMOKE_LOG"; then
               echo "OpenVSCode reported missing web client assets"
               cat "$SMOKE_LOG"
               docker rm -f wpcodespace-openvscode-smoke
@@ -370,6 +399,7 @@ jobs:
               head -40 /tmp/openvscode-smoke-response.html
               curl -fsS http://127.0.0.1:3000/out/vs/code/browser/workbench/workbench.css >/tmp/openvscode-smoke-workbench.css
               curl -fsS http://127.0.0.1:3000/out/nls.messages.js >/tmp/openvscode-smoke-nls.messages.js
+              curl -fsS http://127.0.0.1:3000/out/nls.messages.json >/tmp/openvscode-smoke-nls.messages.json
               fail_on_missing_asset_logs
               tail -120 "$SMOKE_LOG"
               docker rm -f wpcodespace-openvscode-smoke
