@@ -153,6 +153,14 @@ jobs:
 
           cp -a "$SERVER_OUTPUT/." "$IMAGE_CONTEXT/openvscode-server/"
 
+          if [ ! -d out ]; then
+            echo "Missing repository build output directory: out"
+            exit 1
+          fi
+
+          mkdir -p "$IMAGE_CONTEXT/openvscode-server/out"
+          cp -a out/. "$IMAGE_CONTEXT/openvscode-server/out/"
+
           python3 - "$IMAGE_CONTEXT/Dockerfile" <<'PYTHON'
           from pathlib import Path
           import textwrap
@@ -198,6 +206,22 @@ jobs:
           test "$(head -n 1 "$IMAGE_CONTEXT/Dockerfile")" = "FROM ubuntu:24.04"
           grep -nE '^[[:space:]]+(FROM|RUN|COPY|USER|WORKDIR|EXPOSE|CMD)\b' "$IMAGE_CONTEXT/Dockerfile" && exit 1 || true
 
+          REQUIRED_CONTEXT_FILES=(
+            "$IMAGE_CONTEXT/openvscode-server/out/server-main.js"
+            "$IMAGE_CONTEXT/openvscode-server/out/vs/code/browser/workbench/workbench.css"
+            "$IMAGE_CONTEXT/openvscode-server/out/nls.messages.js"
+          )
+
+          for required_file in "${REQUIRED_CONTEXT_FILES[@]}"; do
+            if [ ! -f "$required_file" ]; then
+              echo "Missing Docker context file: $required_file"
+              find "$IMAGE_CONTEXT/openvscode-server/out" -maxdepth 6 -type f | sort | sed -n '1,240p'
+              exit 1
+            fi
+          done
+
+          echo "Found web client assets in Docker context"
+
           echo "=== Docker context ==="
           find "$IMAGE_CONTEXT" -maxdepth 3 -type f | sort | sed -n '1,160p'
           du -sh "$IMAGE_CONTEXT"
@@ -217,10 +241,25 @@ jobs:
           docker image inspect "$SHA_TAG" \
             --format 'image={{.Id}} size={{.Size}} created={{.Created}}'
 
+      - name: Validate built image web assets
+        shell: bash
+        run: |
+          SHA_TAG="$IMAGE_NAME:sha-${GITHUB_SHA}"
+
+          docker run --rm --entrypoint /bin/sh "$SHA_TAG" -c '
+            set -eu
+            test -f /opt/openvscode-server/out/server-main.js
+            test -f /opt/openvscode-server/out/vs/code/browser/workbench/workbench.css
+            test -f /opt/openvscode-server/out/nls.messages.js
+          '
+
+          echo "Found web client assets in built image"
+
       - name: Run container smoke test
         shell: bash
         run: |
           SHA_TAG="$IMAGE_NAME:sha-${GITHUB_SHA}"
+          SMOKE_LOG=/tmp/openvscode-smoke.log
 
           docker rm -f wpcodespace-openvscode-smoke 2>/dev/null || true
 
@@ -229,17 +268,36 @@ jobs:
             -p 3000:3000 \
             "$SHA_TAG"
 
+          fail_on_missing_asset_logs() {
+            docker logs wpcodespace-openvscode-smoke > "$SMOKE_LOG" 2>&1 || true
+
+            if grep -F \
+              -e "File not found: /opt/openvscode-server/out/vs/code/browser/workbench/workbench.css" \
+              -e "File not found: /opt/openvscode-server/out/nls.messages.js" \
+              -e "Error reading NLS messages file" \
+              "$SMOKE_LOG"; then
+              echo "OpenVSCode reported missing web client assets"
+              cat "$SMOKE_LOG"
+              docker rm -f wpcodespace-openvscode-smoke
+              exit 1
+            fi
+          }
+
           for i in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:3000/ >/tmp/openvscode-smoke-response.html; then
               echo "OpenVSCode responded on attempt $i"
               head -40 /tmp/openvscode-smoke-response.html
-              docker logs wpcodespace-openvscode-smoke --tail 120
+              curl -fsS http://127.0.0.1:3000/out/vs/code/browser/workbench/workbench.css >/tmp/openvscode-smoke-workbench.css
+              curl -fsS http://127.0.0.1:3000/out/nls.messages.js >/tmp/openvscode-smoke-nls.messages.js
+              fail_on_missing_asset_logs
+              tail -120 "$SMOKE_LOG"
               docker rm -f wpcodespace-openvscode-smoke
               exit 0
             fi
 
             echo "Waiting for OpenVSCode to respond... attempt $i"
-            docker logs wpcodespace-openvscode-smoke --tail 80 || true
+            fail_on_missing_asset_logs
+            tail -80 "$SMOKE_LOG" || true
             sleep 2
           done
 
