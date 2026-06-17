@@ -77,7 +77,10 @@ jobs:
 
       - name: Build Linux web server output
         shell: bash
-        run: npm run gulp vscode-reh-web-linux-${VSCODE_ARCH}-min
+        run: |
+          npm run server:init
+          npm run compile-web
+          npm run gulp vscode-reh-web-linux-${VSCODE_ARCH}-min-ci
 
       - name: Validate server output path
         shell: bash
